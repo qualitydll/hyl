@@ -1,0 +1,32 @@
+name: Test HyL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+      - name: Resolve dependencies
+        run: go mod tidy
+      - name: Run tests
+        run: go test -race ./...
+      - name: Static analysis
+        run: go vet ./...
+      - name: Build server and client
+        run: |
+          go build -trimpath -o /tmp/hyl-server ./cmd/hyl-server
+          go build -trimpath -o /tmp/hyl-client ./cmd/hyl-client
