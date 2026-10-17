@@ -16,6 +16,36 @@ class CrewShell extends StatefulWidget {
 
 class _CrewShellState extends State<CrewShell> {
   _Tab tab = _Tab.home;
+
+  void _refreshFromStreams() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.state.traffic.addListener(_refreshFromStreams);
+    widget.state.logs.addListener(_refreshFromStreams);
+  }
+
+  @override
+  void didUpdateWidget(covariant CrewShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state != widget.state) {
+      oldWidget.state.traffic.removeListener(_refreshFromStreams);
+      oldWidget.state.logs.removeListener(_refreshFromStreams);
+      widget.state.traffic.addListener(_refreshFromStreams);
+      widget.state.logs.addListener(_refreshFromStreams);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.state.traffic.removeListener(_refreshFromStreams);
+    widget.state.logs.removeListener(_refreshFromStreams);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final desktop = !Platform.isAndroid && MediaQuery.sizeOf(context).width >= 720;
@@ -132,7 +162,25 @@ class _Power extends StatefulWidget {
   State<_Power> createState() => _PowerState();
 }
 class _PowerState extends State<_Power> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2500))..repeat(reverse: true);
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2500));
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.reduced) c.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _Power oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.reduced && !oldWidget.reduced) {
+      c.stop();
+      c.value = 0;
+    } else if (!widget.reduced && oldWidget.reduced) {
+      c.repeat(reverse: true);
+    }
+  }
+
   @override
   void dispose() { c.dispose(); super.dispose(); }
   @override
