@@ -229,8 +229,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=${INSTALL_PATH} start --config ${CONFIG_PATH}
-Restart=on-failure
-RestartSec=5s
+Restart=no
+# The current server is a scaffold; avoid an endless restart loop.
 LimitNOFILE=1048576
 
 # Security hardening
