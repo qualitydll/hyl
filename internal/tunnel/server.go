@@ -197,9 +197,29 @@ func dialPublicTCP(ctx context.Context, host string, port uint16) (net.Conn, err
 }
 
 func isPublicIP(ip net.IP) bool {
-	return ip != nil && !ip.IsPrivate() && !ip.IsLoopback() &&
-		!ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() &&
-		!ip.IsMulticast() && !ip.IsUnspecified()
+	if ip == nil || ip.IsPrivate() || ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() || ip.IsUnspecified() {
+		return false
+	}
+	// Block shared, documentation, benchmark, and reserved ranges too. These
+	// are not suitable as public Internet destinations for a remote proxy.
+	v4Blocked := []string{
+		"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24",
+		"192.88.99.0/24", "198.18.0.0/15", "198.51.100.0/24",
+		"203.0.113.0/24", "240.0.0.0/4",
+	}
+	if v4 := ip.To4(); v4 != nil {
+		for _, block := range v4Blocked {
+			_, network, _ := net.ParseCIDR(block)
+			if network.Contains(v4) {
+				return false
+			}
+		}
+		return true
+	}
+	_, documentationIPv6, _ := net.ParseCIDR("2001:db8::/32")
+	return !documentationIPv6.Contains(ip)
 }
 
 func relay(stream *quic.Stream, target net.Conn) {
