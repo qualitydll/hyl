@@ -2,6 +2,9 @@ package tunnel
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
@@ -38,6 +41,23 @@ func RunClient(ctx context.Context, cfg *config.ClientConfig) error {
 		MinVersion: tls.VersionTLS13,
 		ServerName: serverName,
 		NextProtos: []string{alpnProtocol},
+	}
+	if cfg.TLS.PinSHA256 != "" {
+		expected, err := hex.DecodeString(strings.ReplaceAll(cfg.TLS.PinSHA256, ":", ""))
+		if err != nil || len(expected) != sha256.Size {
+			return fmt.Errorf("tls.pin_sha256 must be a 64-character SHA-256 hex fingerprint")
+		}
+		// Pinning the exact certificate is an explicit trust decision. Standard
+		// CA/name validation is replaced only when this exact pin is configured.
+		tlsConfig.InsecureSkipVerify = true //nolint:gosec
+		tlsConfig.VerifyConnection = func(state tls.ConnectionState) error {
+			if len(state.PeerCertificates) == 0 { return fmt.Errorf("server sent no certificate") }
+			got := sha256.Sum256(state.PeerCertificates[0].Raw)
+			if subtle.ConstantTimeCompare(got[:], expected) != 1 {
+				return fmt.Errorf("server certificate SHA-256 pin mismatch")
+			}
+			return nil
+		}
 	}
 	if cfg.TLS.Insecure {
 		// Explicit opt-in only. Certificate verification remains enabled by default.
