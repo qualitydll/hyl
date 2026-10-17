@@ -216,6 +216,16 @@ EOF
 chmod 600 "$CONFIG_PATH"
 ok "Config written to $CONFIG_PATH"
 
+if ! getent group hyl >/dev/null 2>&1; then
+    if command -v groupadd >/dev/null 2>&1; then groupadd --system hyl; else addgroup -S hyl; fi
+fi
+if ! id -u hyl >/dev/null 2>&1; then
+    if command -v useradd >/dev/null 2>&1; then useradd --system --gid hyl --home-dir /nonexistent --shell /sbin/nologin hyl; else adduser -S -D -H -G hyl -s /sbin/nologin hyl; fi
+fi
+chown root:hyl /etc/hyl "$CONFIG_PATH" "$CERT_PATH" "$KEY_PATH"
+chmod 750 /etc/hyl
+chmod 640 "$CONFIG_PATH" "$CERT_PATH" "$KEY_PATH"
+
 # ── Create systemd unit ───────────────────────────────────────────────────────
 header "Configuring systemd service"
 
@@ -228,16 +238,24 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=hyl
+Group=hyl
 ExecStart=${INSTALL_PATH} start --config ${CONFIG_PATH}
-Restart=no
-# The current server is a scaffold; avoid an endless restart loop.
-LimitNOFILE=1048576
+Restart=on-failure
+RestartSec=5s
+LimitNOFILE=65536
 
-# Security hardening
 NoNewPrivileges=yes
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/etc/hyl /var/log
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
 
 [Install]
 WantedBy=multi-user.target
@@ -272,7 +290,8 @@ fi
 header "Installation complete!"
 
 echo -e "${BOLD}Connection URI:${NC}"
-echo -e "  ${GREEN}hyl://${USER_PASS}@${SERVER_IP}:${PORT}${NC}"
+CERT_PIN="$(openssl x509 -in "$CERT_PATH" -outform DER | sha256sum | cut -d ' ' -f 1)"
+echo -e "  ${GREEN}hyl://${USER_PASS}@${SERVER_IP}:${PORT}?pin=${CERT_PIN}${NC}"
 echo
 echo -e "${BOLD}Useful commands:${NC}"
 echo -e "  Status  : systemctl status hyl"
@@ -281,4 +300,5 @@ echo -e "  Restart : systemctl restart hyl"
 echo -e "  Config  : ${CONFIG_PATH}"
 echo
 warn "Save the connection URI above — you'll need it for your client."
-warn "This build currently contains server startup scaffolding, not a working QUIC/VPN data plane. A running service does not yet mean VPN traffic is supported."
+warn "HyL currently forwards TCP through authenticated QUIC/SOCKS5 only; it is not a full-device VPN and does not tunnel UDP."
+warn "The URI pins this self-signed certificate. Keep it secret and do not share it publicly."
