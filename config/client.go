@@ -27,6 +27,7 @@ type ClientTLS struct {
 	SNI      string `yaml:"sni"`
 	Insecure bool   `yaml:"insecure"`
 	CA       string `yaml:"ca"`
+	PinSHA256 string `yaml:"pin_sha256"`
 }
 
 type ClientCongestion struct {
