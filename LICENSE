@@ -1,0 +1,3 @@
+Crew contains code derived from the Brew client project and is distributed under the GNU General Public License, version 3.0 or later. See https://www.gnu.org/licenses/gpl-3.0.html for the full license text.
+
+Mihomo and libmihomo-android are separate third-party components with their own notices. Their license and corresponding-source requirements must be preserved when redistributing binaries.
