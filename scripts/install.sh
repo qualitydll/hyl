@@ -150,6 +150,7 @@ if [[ -z "$USER_PASS" ]]; then
     USER_PASS=$(openssl rand -hex 24)
     info "Generated password: ${BOLD}${USER_PASS}${NC}"
 fi
+[[ "$USER_PASS" =~ ^[A-Za-z0-9_-]{16,1024}$ ]] || die "Password must be 16-1024 characters using only letters, digits, underscore, or hyphen."
 ok "Password configured"
 
 # Domain / IP
