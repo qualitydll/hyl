@@ -66,7 +66,7 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig) error {
 	}
 }
 
-func serveConnection(ctx context.Context, conn *quic.Conn, password string) {
+func serveConnection(ctx context.Context, conn *quic.Conn, password string) {\n\tserveConnectionWithDialer(ctx, conn, password, dialPublicTCP)\n}\n\nfunc serveConnectionWithDialer(ctx context.Context, conn *quic.Conn, password string, dial func(context.Context, string, uint16) (net.Conn, error)) {
 	defer conn.CloseWithError(0, "connection closed")
 	authCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -105,11 +105,11 @@ func serveConnection(ctx context.Context, conn *quic.Conn, password string) {
 		if err != nil {
 			return
 		}
-		go handleTCPStream(stream)
+		go handleTCPStreamWithDialer(stream, dial)
 	}
 }
 
-func handleTCPStream(stream *quic.Stream) {
+func handleTCPStream(stream *quic.Stream) {\n\thandleTCPStreamWithDialer(stream, dialPublicTCP)\n}\n\nfunc handleTCPStreamWithDialer(stream *quic.Stream, dial func(context.Context, string, uint16) (net.Conn, error)) {
 	defer stream.Close()
 	kind, err := readByte(stream)
 	if err != nil || kind != connectTCP {
@@ -139,7 +139,7 @@ func handleTCPStream(stream *quic.Stream) {
 
 	ctx, cancel := context.WithTimeout(stream.Context(), 10*time.Second)
 	defer cancel()
-	target, err := dialPublicTCP(ctx, host, port)
+	target, err := dial(ctx, host, port)
 	if err != nil {
 		_ = stream.Write([]byte{1})
 		return
@@ -204,10 +204,10 @@ func relay(stream *quic.Stream, target net.Conn) {
 		done <- struct{}{}
 	}()
 	<-done
+	<-done
 	_ = target.Close()
 	_ = stream.CancelRead(0)
 	_ = stream.CancelWrite(0)
-	<-done
 }
 
 func readByte(r io.Reader) (byte, error) {
