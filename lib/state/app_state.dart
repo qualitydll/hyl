@@ -935,6 +935,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void notifySettingsChanged() => notifyListeners();
+
   void clearError() {
     error = null;
     skipped = const [];
