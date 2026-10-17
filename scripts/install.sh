@@ -133,22 +133,27 @@ fi
 header "Configuration"
 
 # Port
-read -rp "$(echo -e "${CYAN}[?]${NC} Server port [default: 443]: ")" USER_PORT
+read -rp "$(echo -e "${CYAN}[?]${NC} Server port [default: 443]: ")" USER_PORT </dev/tty
 PORT="${USER_PORT:-443}"
+[[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT >= 1 && PORT <= 65535 )) || die "Invalid port: $PORT (must be 1-65535)"
 ok "Port: $PORT"
 
 # Password
-read -rsp "$(echo -e "${CYAN}[?]${NC} Auth password [leave blank for random]: ")" USER_PASS
+read -rsp "$(echo -e "${CYAN}[?]${NC} Auth password [leave blank for random]: ")" USER_PASS </dev/tty
 echo
 if [[ -z "$USER_PASS" ]]; then
-    USER_PASS=$(openssl rand -base64 18 | tr -d '=+/' | head -c 24)
+    USER_PASS=$(openssl rand -hex 24)
     info "Generated password: ${BOLD}${USER_PASS}${NC}"
 fi
 ok "Password configured"
 
 # Domain / IP
-SERVER_IP=$(curl -fsSL https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
-ok "Public IP: $SERVER_IP"
+SERVER_IP=$(curl -fsSL --max-time 8 https://api.ipify.org 2>/dev/null || true)
+if [[ -z "$SERVER_IP" ]]; then
+    SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+[[ -n "$SERVER_IP" ]] || die "Could not detect the server IP. Set up network connectivity and retry."
+ok "Detected address: $SERVER_IP"
 
 # ── Create directories ────────────────────────────────────────────────────────
 header "Setting up files"
@@ -235,8 +240,19 @@ EOF
 
 systemctl daemon-reload
 systemctl enable hyl --quiet
-systemctl restart hyl || warn "Service start failed — check logs: journalctl -u hyl -n 50"
-ok "systemd service enabled and started"
+if systemctl restart hyl; then
+    sleep 2
+    if systemctl is-active --quiet hyl; then
+        ok "systemd service is active"
+    else
+        warn "Service did not stay active. Recent logs:"
+        journalctl -u hyl -n 30 --no-pager || true
+        die "HyL service failed to start; configuration was installed but service is NOT running."
+    fi
+else
+    journalctl -u hyl -n 30 --no-pager || true
+    die "Could not start HyL service."
+fi
 
 # ── Allow firewall ────────────────────────────────────────────────────────────
 if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
@@ -260,3 +276,4 @@ echo -e "  Restart : systemctl restart hyl"
 echo -e "  Config  : ${CONFIG_PATH}"
 echo
 warn "Save the connection URI above — you'll need it for your client."
+warn "This build currently contains server startup scaffolding, not a working QUIC/VPN data plane. A running service does not yet mean VPN traffic is supported."
