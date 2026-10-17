@@ -1,0 +1,11 @@
+module github.com/qualitydll/hyl
+
+go 1.22
+
+require (
+	github.com/apernet/quic-go v0.48.2-0.20241127005659-923f4c86b067
+	github.com/spf13/cobra v1.8.1
+	go.uber.org/zap v1.27.0
+	golang.org/x/crypto v0.26.0
+	gopkg.in/yaml.v3 v3.0.1
+)
