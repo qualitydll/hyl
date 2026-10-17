@@ -31,5 +31,5 @@ for size in sizes:
         draw.ellipse((x-node_r, y-node_r, x+node_r, y+node_r), fill=white)
     draw.ellipse((center[0]-hub_r, center[1]-hub_r, center[0]+hub_r, center[1]+hub_r), fill=white)
     images.append(image.resize((size, size), Image.Resampling.LANCZOS))
-images[-1].save(target, format="ICO", sizes=[(s, s) for s in sizes], append_images=images[:-1])
+images[-1].save(target, format="ICO", sizes=[(s, s) for s in sizes])
 print(f"Generated Crew icon: {target}")
