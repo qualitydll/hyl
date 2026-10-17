@@ -56,8 +56,7 @@ ARCH="$(uname -m)"
 case "$ARCH" in
     x86_64)  ARCH_LABEL="amd64" ;;
     aarch64) ARCH_LABEL="arm64" ;;
-    armv7l)  ARCH_LABEL="armv7" ;;
-    *)       die "Unsupported architecture: $ARCH" ;;
+    *)       die "Unsupported architecture: $ARCH. Supported: x86_64, aarch64" ;;
 esac
 ok "Architecture: $ARCH_LABEL"
 
@@ -89,16 +88,21 @@ LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2
 if [[ -n "$LATEST_TAG" ]]; then
     BINARY_NAME="hyl-server-linux-${ARCH_LABEL}"
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${BINARY_NAME}"
+    TMP_BINARY="$(mktemp)"
     info "Downloading ${BINARY_NAME} (${LATEST_TAG})…"
-    if curl -fsSL "$DOWNLOAD_URL" -o "$INSTALL_PATH" 2>/dev/null; then
-        chmod +x "$INSTALL_PATH"
+    # Avoid curl -f: a missing asset must trigger the source-build fallback.
+    # Check HTTP status explicitly so a 404 response body is never installed as a binary.
+    HTTP_STATUS="$(curl -sSL -w '%{http_code}' "$DOWNLOAD_URL" -o "$TMP_BINARY" 2>/dev/null || true)"
+    if [[ "$HTTP_STATUS" == "200" && -s "$TMP_BINARY" ]]; then
+        install -m 0755 "$TMP_BINARY" "$INSTALL_PATH"
         ok "Binary downloaded: $LATEST_TAG"
         BINARY_INSTALLED=true
     else
-        warn "Pre-built binary not found in release, will build from source."
+        rm -f "$TMP_BINARY"
+        warn "Pre-built binary unavailable (HTTP ${HTTP_STATUS:-unknown}); building from source."
     fi
 else
-    info "No releases found yet — building from source (this takes ~2 min)."
+    info "No published release found yet — building from source (this takes ~2 min)."
 fi
 
 # 2) Fallback: собрать из исходников
