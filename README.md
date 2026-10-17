@@ -1,6 +1,6 @@
 # HyL — Hysteria Lite
 
-> A lightweight, mobile-optimized QUIC VPN protocol — a fork of [Hysteria2](https://github.com/apernet/hysteria) with an adaptive congestion control, automatic transport fallback, and a one-command server setup.
+> An early-stage QUIC VPN prototype inspired by [Hysteria2](https://github.com/apernet/hysteria). The server/client data plane is not implemented yet; this repository is not currently a usable VPN.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev)
@@ -9,16 +9,16 @@
 
 ## Why HyL?
 
-Hysteria2 is great for raw throughput on bad networks. HyL extends it with:
+HyL is currently an experimental scaffold. The following components are planned or partially implemented, not yet a production-ready VPN:
 
 | Feature | Hysteria2 | HyL |
 |---|---|---|
-| Congestion control | Brutal (fixed aggressive) | **Adaptive** (Brutal ↔ Economy, auto-switching) |
-| Transport fallback | Manual config | **Auto** UDP → WebSocket when UDP blocked |
-| Battery drain | Not optimized | **Idle keepalive** (slow ping in background) |
-| Server setup | Manual | **One-command OOBE installer** |
+| Congestion control | Brutal | Adaptive controller prototype |
+| Transport fallback | Manual config | Transport switcher prototype (not wired into a working tunnel) |
+| Battery drain | Not optimized | Keepalive component prototype |
+| Server setup | Manual | Installer sets up a service scaffold; does not enable VPN traffic yet |
 | Homebrew tap | — | `brew install qualitydll/hyl/hyl` |
-| Obfuscation | Salamander | Salamander (same, preserved) |
+| Obfuscation | Salamander | Obfuscation component prototype |
 
 ---
 
@@ -29,14 +29,13 @@ Hysteria2 is great for raw throughput on bad networks. HyL extends it with:
 curl -fsSL https://raw.githubusercontent.com/qualitydll/hyl/main/scripts/install.sh | sudo bash
 ```
 
-The installer will:
-1. Detect your OS and install dependencies
-2. Download the latest `hyl-server` binary
-3. Generate a self-signed TLS certificate
-4. Prompt for port (default 443) and password (random if blank)
-5. Create `/etc/hyl/server.yaml`
-6. Register and start a `systemd` service
-7. Print your connection URI: `hyl://password@IP:port`
+The installer will detect the OS, try a published binary and otherwise build from source, generate TLS material, prompt for settings, and configure a systemd service. **The current server executable does not implement the QUIC/VPN data plane**, so a running service is not a working VPN. Do not use this as a production VPN yet.
+
+---
+
+## Current status
+
+The client and server commands currently load configuration and print startup messages, but do not establish a QUIC tunnel or route user traffic. CLI flags and the connection URI shown in older examples are not fully implemented. The installer is being hardened, but it cannot turn this prototype into a functioning VPN until the data plane is implemented and tested.
 
 ---
 
