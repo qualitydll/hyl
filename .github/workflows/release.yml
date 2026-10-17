@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build release binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache: true
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build Linux and macOS binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            GOOS="${target%/*}"
+            GOARCH="${target#*/}"
+            for app in hyl-client hyl-server; do
+              echo "Building ${app} for ${GOOS}/${GOARCH}"
+              CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+                go build -trimpath -ldflags="-s -w" \
+                -o "dist/${app}-${GOOS}-${GOARCH}" "./cmd/${app}"
+            done
+          done
+          (cd dist && sha256sum hyl-* > SHA256SUMS)
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/hyl-client-linux-amd64
+            dist/hyl-server-linux-amd64
+            dist/hyl-client-linux-arm64
+            dist/hyl-server-linux-arm64
+            dist/hyl-client-darwin-amd64
+            dist/hyl-server-darwin-amd64
+            dist/hyl-client-darwin-arm64
+            dist/hyl-server-darwin-arm64
+            dist/SHA256SUMS
+          generate_release_notes: true
