@@ -79,6 +79,7 @@ func serveConnectionWithDialer(ctx context.Context, conn *quic.Conn, password st
 		return
 	}
 	defer stream.Close()
+	_ = stream.SetDeadline(time.Now().Add(10 * time.Second))
 
 	kind, err := readByte(stream)
 	if err != nil || kind != authRequest {
@@ -99,9 +100,11 @@ func serveConnectionWithDialer(ctx context.Context, conn *quic.Conn, password st
 		_ = stream.Write([]byte{1})
 		return
 	}
+	_ = stream.SetDeadline(time.Time{})
 	if _, err := stream.Write([]byte{0}); err != nil {
 		return
 	}
+	_ = stream.SetDeadline(time.Time{})
 	_ = stream.Close()
 
 	for {
@@ -119,6 +122,7 @@ func handleTCPStream(stream *quic.Stream) {
 
 func handleTCPStreamWithDialer(stream *quic.Stream, dial func(context.Context, string, uint16) (net.Conn, error)) {
 	defer stream.Close()
+	_ = stream.SetDeadline(time.Now().Add(10 * time.Second))
 	kind, err := readByte(stream)
 	if err != nil || kind != connectTCP {
 		_ = stream.Write([]byte{1})
