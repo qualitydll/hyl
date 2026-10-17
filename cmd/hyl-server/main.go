@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/qualitydll/hyl/config"
+	"github.com/qualitydll/hyl/internal/tunnel"
 )
 
-const version = "0.1.0"
+const version = "0.1.1"
 
 var (
 	cfgFile string
@@ -20,18 +24,16 @@ var (
 func main() {
 	root := &cobra.Command{
 		Use:   "hyl-server",
-		Short: "HyL Server — Hysteria Lite VPN server",
-		Long:  "HyL (Hysteria Lite) is a lightweight QUIC-based VPN prototype; the data plane is not implemented yet.",
+		Short: "HyL Server — QUIC TCP proxy server",
+		Long:  "HyL uses authenticated QUIC streams to provide a TCP CONNECT proxy. It is not a full IP-level TUN VPN yet.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			logger, err = zap.NewProduction()
 			return err
 		},
 	}
-
 	root.PersistentFlags().StringVarP(&cfgFile, "config", "c", "/etc/hyl/server.yaml", "path to server config file")
 	root.AddCommand(startCmd(), versionCmd())
-
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -47,16 +49,13 @@ func startCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to load config %q: %w", cfgFile, err)
 			}
-
-			logger.Info("HyL server startup requested",
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			logger.Info("Starting HyL QUIC server",
 				zap.String("version", version),
 				zap.String("listen", cfg.Listen),
-				zap.String("congestion_mode", cfg.Congestion.Mode),
 			)
-
-			// Fail closed: do not claim the service is listening when there is
-			// no QUIC listener, authentication handler, or VPN data plane.
-			return fmt.Errorf("HyL server data plane is not implemented; refusing to start a misleading idle service")
+			return tunnel.RunServer(ctx, cfg)
 		},
 	}
 }
