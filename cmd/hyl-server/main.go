@@ -21,7 +21,7 @@ func main() {
 	root := &cobra.Command{
 		Use:   "hyl-server",
 		Short: "HyL Server — Hysteria Lite VPN server",
-		Long:  "HyL (Hysteria Lite) is a lightweight QUIC-based VPN protocol optimized for mobile clients.",
+		Long:  "HyL (Hysteria Lite) is a lightweight QUIC-based VPN prototype; the data plane is not implemented yet.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			logger, err = zap.NewProduction()
@@ -30,7 +30,6 @@ func main() {
 	}
 
 	root.PersistentFlags().StringVarP(&cfgFile, "config", "c", "/etc/hyl/server.yaml", "path to server config file")
-
 	root.AddCommand(startCmd(), versionCmd())
 
 	if err := root.Execute(); err != nil {
@@ -49,18 +48,15 @@ func startCmd() *cobra.Command {
 				return fmt.Errorf("failed to load config %q: %w", cfgFile, err)
 			}
 
-			logger.Info("Starting HyL server",
+			logger.Info("HyL server startup requested",
 				zap.String("version", version),
 				zap.String("listen", cfg.Listen),
 				zap.String("congestion_mode", cfg.Congestion.Mode),
 			)
 
-			// TODO: initialize QUIC listener with AdaptiveSender, Salamander obfs
-			// and serve connections. This is the next implementation milestone.
-			logger.Info("Server ready", zap.String("listen", cfg.Listen))
-
-			// Block forever (real impl will use signal handling)
-			select {}
+			// Fail closed: do not claim the service is listening when there is
+			// no QUIC listener, authentication handler, or VPN data plane.
+			return fmt.Errorf("HyL server data plane is not implemented; refusing to start a misleading idle service")
 		},
 	}
 }
