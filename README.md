@@ -29,13 +29,13 @@ HyL is currently an experimental scaffold. The following components are planned 
 curl -fsSL https://raw.githubusercontent.com/qualitydll/hyl/main/scripts/install.sh | sudo bash
 ```
 
-The installer will detect the OS, try a published binary and otherwise build from source, generate TLS material, prompt for settings, and configure a systemd service. **The current server executable does not implement the QUIC/VPN data plane**, so a running service is not a working VPN. Do not use this as a production VPN yet.
+The installer detects the OS, tries a published binary and otherwise builds from source, generates TLS material, prompts for settings, and configures a systemd service. **The current server executable does not implement the QUIC/VPN data plane** and now exits with an explicit error instead of pretending it is listening. Do not use this as a production VPN.
 
 ---
 
 ## Current status
 
-The client and server commands currently load configuration and print startup messages, but do not establish a QUIC tunnel or route user traffic. CLI flags and the connection URI shown in older examples are not fully implemented. The installer is being hardened, but it cannot turn this prototype into a functioning VPN until the data plane is implemented and tested.
+The client and server commands load configuration but do not establish a QUIC tunnel or route user traffic. They intentionally exit with an error instead of printing a misleading ready message. CLI flags and the connection URI shown in older examples are not fully implemented. The installer cannot turn this prototype into a functioning VPN until the data plane is implemented and tested.
 
 ---
 
@@ -141,7 +141,7 @@ log:
 
 ## Obfuscation
 
-HyL uses **Salamander** obfuscation (same as Hysteria2): each UDP packet is XOR'd with `BLAKE2b-256(PSK || random_8_byte_salt)`. The salt is prepended on the wire. This hides traffic from shallow DPI but does not replace TLS.
+HyL contains a Salamander-style packet-obfuscation prototype. Packet salts now use Go's `crypto/rand`, rather than predictable `math/rand`. **Obfuscation is not encryption or authentication and does not guarantee resistance to DPI.** A future working implementation must rely on correctly configured QUIC/TLS for confidentiality and integrity. QUIC Initial packets expose some handshake information to passive observers; see [RFC 9001](https://www.rfc-editor.org/rfc/rfc9001.html).
 
 To enable:
 ```yaml
@@ -188,6 +188,12 @@ go build ./cmd/hyl-client
 - [ ] UDP hop (port rotation for whitelist bypass)
 - [ ] Android/iOS SDK via `gomobile`
 - [ ] Automated GitHub Releases + Homebrew bottle CI
+
+---
+
+## Security status
+
+See [SECURITY.md](SECURITY.md) for current limitations and deployment guidance. HyL is not ready for public or production use; its server does not implement authentication, a QUIC listener, or a traffic-forwarding data plane.
 
 ---
 
