@@ -3,8 +3,8 @@
 package obfs
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"syscall"
@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	smPSKMinLen  = 4
-	smSaltLen    = 8
-	smKeyLen     = 32 // blake2b.Size256
+	smPSKMinLen   = 4
+	smSaltLen     = 8
+	smKeyLen      = 32 // blake2b.Size256
 	udpBufferSize = 2048
 )
 
@@ -29,10 +29,11 @@ type obfuscator interface {
 }
 
 // salamanderObfuscator obfuscates each packet with BLAKE2b-256(PSK || random_salt).
-// Wire format: [8-byte salt][XOR'd payload]
+// Wire format: [8-byte salt][XOR'd payload].
+// The salt is generated with crypto/rand; math/rand is not suitable here because
+// predictable/repeated salts can reuse the same XOR keystream.
 type salamanderObfuscator struct {
-	PSK     []byte
-	RandSrc *rand.Rand
+	PSK []byte
 
 	lk       sync.Mutex
 	keyInput []byte
@@ -47,7 +48,6 @@ func newSalamanderObfuscator(psk []byte) (*salamanderObfuscator, error) {
 	copy(keyInput, pskCopy)
 	return &salamanderObfuscator{
 		PSK:      pskCopy,
-		RandSrc:  rand.New(rand.NewSource(time.Now().UnixNano())), //nolint:gosec
 		keyInput: keyInput,
 	}, nil
 }
@@ -66,8 +66,10 @@ func (o *salamanderObfuscator) Obfuscate(in, out []byte) int {
 	if len(out) < outLen {
 		return 0
 	}
+	if _, err := rand.Read(out[:smSaltLen]); err != nil {
+		return 0
+	}
 	o.lk.Lock()
-	_, _ = o.RandSrc.Read(out[:smSaltLen])
 	key := o.keyLocked(out[:smSaltLen])
 	o.lk.Unlock()
 	for i, c := range in {
@@ -151,6 +153,10 @@ func (c *obfsPacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 func (c *obfsPacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	c.writeMutex.Lock()
 	nn := c.Obfs.Obfuscate(p, c.writeBuf)
+	if nn == 0 {
+		c.writeMutex.Unlock()
+		return 0, fmt.Errorf("Salamander could not obfuscate packet (buffer too small or secure random source failed)")
+	}
 	_, err = c.Conn.WriteTo(c.writeBuf[:nn], addr)
 	c.writeMutex.Unlock()
 	if err == nil {
@@ -165,6 +171,6 @@ func (c *obfsPacketConn) SetDeadline(t time.Time) error      { return c.Conn.Set
 func (c *obfsPacketConn) SetReadDeadline(t time.Time) error  { return c.Conn.SetReadDeadline(t) }
 func (c *obfsPacketConn) SetWriteDeadline(t time.Time) error { return c.Conn.SetWriteDeadline(t) }
 
-func (c *obfsPacketConnUDP) SetReadBuffer(bytes int) error        { return c.UDPConn.SetReadBuffer(bytes) }
-func (c *obfsPacketConnUDP) SetWriteBuffer(bytes int) error       { return c.UDPConn.SetWriteBuffer(bytes) }
+func (c *obfsPacketConnUDP) SetReadBuffer(bytes int) error         { return c.UDPConn.SetReadBuffer(bytes) }
+func (c *obfsPacketConnUDP) SetWriteBuffer(bytes int) error        { return c.UDPConn.SetWriteBuffer(bytes) }
 func (c *obfsPacketConnUDP) SyscallConn() (syscall.RawConn, error) { return c.UDPConn.SyscallConn() }
