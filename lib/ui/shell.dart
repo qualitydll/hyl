@@ -267,7 +267,7 @@ class _Activity extends StatelessWidget {
 
 class _Settings extends StatelessWidget {
   const _Settings({required this.state}); final AppState state;
-  void save(BuildContext context, VoidCallback change) { change(); state.notifyListeners(); }
+  void save(BuildContext context, VoidCallback change) { change(); state.notifySettingsChanged(); }
   @override
   Widget build(BuildContext context) {
     final s = state.settings; final cs = Theme.of(context).colorScheme;
@@ -284,7 +284,7 @@ class _Settings extends StatelessWidget {
         const Text('Анимации и доступность', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Уменьшить движение'), subtitle: const Text('Отключает декоративную анимацию'), value: s.reducedMotion, onChanged: (v) => save(context, () { s.reducedMotion = v; s.animationDuration = v ? 0 : 360; })),
         ListTile(contentPadding: EdgeInsets.zero, title: const Text('Стиль движения'), trailing: DropdownButton<String>(value: s.motionPreset, underline: const SizedBox.shrink(), items: const [DropdownMenuItem(value: 'fluid', child: Text('Fluid')), DropdownMenuItem(value: 'soft', child: Text('Soft')), DropdownMenuItem(value: 'spring', child: Text('Spring')), DropdownMenuItem(value: 'slide', child: Text('Slide')), DropdownMenuItem(value: 'fade', child: Text('Fade'))], onChanged: (v) { if (v != null) save(context, () => s.motionPreset = v); })),
-        ListTile(contentPadding: EdgeInsets.zero, title: const Text('Длительность переходов'), subtitle: Text(s.animationDuration.toString() + ' мс'), trailing: SizedBox(width: 130, child: Slider(min: 0, max: 900, divisions: 9, value: s.animationDuration.toDouble(), onChanged: (v) => save(context, () => s.animationDuration = v.round()))),
+        ListTile(contentPadding: EdgeInsets.zero, title: const Text('Длительность переходов'), subtitle: Text(s.animationDuration.toString() + ' мс'), trailing: SizedBox(width: 130, child: Slider(min: 0, max: 900, divisions: 9, value: s.animationDuration.toDouble(), onChanged: (v) => save(context, () => s.animationDuration = v.round())))),
         SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Компактный интерфейс'), value: s.compactDensity, onChanged: (v) => save(context, () => s.compactDensity = v)),
         ListTile(contentPadding: EdgeInsets.zero, title: const Text('Размер кнопки'), trailing: SegmentedButton<int>(segments: const [ButtonSegment(value: 0, label: Text('S')), ButtonSegment(value: 1, label: Text('M')), ButtonSegment(value: 2, label: Text('L'))], selected: {s.connectButtonSize}, onSelectionChanged: (v) => save(context, () => s.connectButtonSize = v.first))),
       ])),
