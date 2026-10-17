@@ -34,17 +34,6 @@ class CoreOptions {
   final bool sniSpoofing;
 }
 
-/// Domains that are reliably allowed on Russian mobile networks during
-/// whitelist-mode restrictions.
-const _sniWhitelistDomains = [
-  'gosuslugi.ru',
-  'vk.com',
-  'yandex.ru',
-  'sberbank.ru',
-  'mail.ru',
-  'ok.ru',
-];
-
 const _privateRules = [
   'IP-CIDR,127.0.0.0/8,DIRECT,no-resolve',
   'IP-CIDR,10.0.0.0/8,DIRECT,no-resolve',
@@ -118,25 +107,9 @@ Map<String, dynamic> applyCoreOptions(
   cfg['find-process-mode'] = 'off';
   cfg['profile'] = {'store-selected': true, 'store-fake-ip': true};
 
-  // SNI Spoofing: replace the servername of every proxy so the TLS
-  // ClientHello shows a whitelisted domain to the operator's DPI filter.
-  if (o.sniSpoofing) {
-    final proxies = cfg['proxies'];
-    if (proxies is List) {
-      var domainIndex = 0;
-      cfg['proxies'] = [
-        for (final proxy in proxies)
-          if (proxy is Map)
-            {
-              ...proxy,
-              'servername': _sniWhitelistDomains[
-                  domainIndex++ % _sniWhitelistDomains.length],
-            }
-          else
-            proxy,
-      ];
-    }
-  }
+  // Preserve the servername supplied by the provider. Generic replacement
+  // with an unrelated hostname can break TLS, certificate checks and REALITY.
+  // The legacy preference is retained for settings compatibility only.
 
   if (o.userRules.isNotEmpty) {
     // Mihomo uses first-match semantics, so custom rules take precedence.
