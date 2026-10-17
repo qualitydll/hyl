@@ -1,203 +1,69 @@
 # HyL — Hysteria Lite
 
-> An early-stage QUIC VPN prototype inspired by [Hysteria2](https://github.com/apernet/hysteria). The server/client data plane is not implemented yet; this repository is not currently a usable VPN.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev)
-
----
-
-## Why HyL?
-
-HyL is currently an experimental scaffold. The following components are planned or partially implemented, not yet a production-ready VPN:
-
-| Feature | Hysteria2 | HyL |
-|---|---|---|
-| Congestion control | Brutal | Adaptive controller prototype |
-| Transport fallback | Manual config | Transport switcher prototype (not wired into a working tunnel) |
-| Battery drain | Not optimized | Keepalive component prototype |
-| Server setup | Manual | Installer sets up a service scaffold; does not enable VPN traffic yet |
-| Homebrew tap | — | `brew install qualitydll/hyl/hyl` |
-| Obfuscation | Salamander | Obfuscation component prototype |
-
----
-
-## Quick Start: Server
-
-```bash
-# On your VPS/VDS (Ubuntu, Debian, CentOS, Fedora):
-curl -fsSL https://raw.githubusercontent.com/qualitydll/hyl/main/scripts/install.sh | sudo bash
-```
-
-The installer detects the OS, tries a published binary and otherwise builds from source, generates TLS material, prompts for settings, and configures a systemd service. **The current server executable does not implement the QUIC/VPN data plane** and now exits with an explicit error instead of pretending it is listening. Do not use this as a production VPN.
-
----
+HyL is an experimental authenticated QUIC-based TCP proxy inspired by Hysteria2. The current client can expose a local SOCKS5 endpoint and forward TCP CONNECT traffic through a QUIC connection.
 
 ## Current status
 
-The client and server commands load configuration but do not establish a QUIC tunnel or route user traffic. They intentionally exit with an error instead of printing a misleading ready message. CLI flags and the connection URI shown in older examples are not fully implemented. The installer cannot turn this prototype into a functioning VPN until the data plane is implemented and tested.
+- Implemented: QUIC/TLS 1.3 transport, password authentication, certificate verification, optional SHA-256 certificate pinning, local SOCKS5 TCP CONNECT, public-destination filtering, systemd installer hardening.
+- Not implemented: full IP-level TUN VPN, UDP forwarding, SOCKS5 UDP ASSOCIATE, Android embedding, WebSocket fallback, and production-grade DPI resistance.
+- The adaptive congestion and Salamander packages are prototypes and are not wired into the active transport.
 
----
+## Server install
 
-## Quick Start: Client
+On a supported Linux VPS:
 
-### macOS / Linux (Homebrew)
+    curl -fsSL https://raw.githubusercontent.com/qualitydll/hyl/main/scripts/install.sh | sudo bash
 
-```bash
-brew tap qualitydll/hyl
-brew install hyl
-```
+The installer generates a certificate if needed, creates a long random password when you leave the password prompt blank, computes the certificate's SHA-256 fingerprint, configures a restricted systemd service account, and opens the selected UDP port in common host firewalls when available. You must also check the firewall/security group in your VPS provider panel.
 
-### From source
+The installer prints a connection URI in this form:
 
-```bash
-go install github.com/qualitydll/hyl/cmd/hyl-client@latest
-```
+    hyl://PASSWORD@SERVER_IP:443?pin=SHA256_CERTIFICATE_FINGERPRINT
 
-### Usage
+The URI contains a password and must be treated as a secret. Do not publish it in issues, screenshots, or chats.
 
-```bash
-# Start with a config file
-hyl start --config client.yaml
+## Brew support
 
-# Or inline for quick test
-hyl start --server your-vps:443 --password yourpassword
-```
+Brew's Windows build can bundle the HyL client and represent each hyl:// URI as a local SOCKS5 outbound in Mihomo. The Windows client launches the HyL sidecar and waits for its SOCKS5 port before starting Mihomo. Current support is TCP-only. Android is not integrated yet; Brew will report that limitation instead of pretending to connect.
 
----
+Use a recent Windows artifact from the Brew GitHub Actions workflow. For a self-signed server certificate, use the pin in the URI; it authenticates the exact certificate. When the certificate is renewed, distribute the new pin.
 
-## Configuration
+## Client config
 
-### Server (`/etc/hyl/server.yaml`)
+    server: "vpn.example:443"
+    auth:
+      password: "use-a-long-random-secret"
+    tls:
+      sni: "vpn.example"
+      insecure: false
+      ca: ""
+      pin_sha256: "64-hex-character-sha256-certificate-fingerprint"
+    local_socks: "127.0.0.1:10808"
+    mobile:
+      keepalive_interval: 25s
 
-```yaml
-listen: "0.0.0.0:443"
+Run the client with:
 
-auth:
-  password: "your-strong-password"
+    hyl start --config client.yaml
 
-tls:
-  cert: /etc/hyl/server.crt
-  key:  /etc/hyl/server.key
+SOCKS5 is available at 127.0.0.1:10808. It supports TCP CONNECT only. If pin_sha256 is configured, the exact server certificate is verified. Otherwise normal system CA/name verification is enabled by default. Setting tls.insecure to true disables certificate verification and should be avoided.
 
-congestion:
-  # auto: switches between brutal and economy based on network conditions
-  # brutal: always aggressive (like original Hy2)
-  # economy: always conservative (best for battery on server side)
-  mode: auto
+## DPI and security
 
-bandwidth:
-  up: 100    # Mbps hint for clients
-  down: 100
+TLS 1.3 protects application data after the handshake, but QUIC Initial packets can reveal parts of the TLS handshake to passive observers. Certificate pinning authenticates the server; it does not hide the server IP or make the traffic indistinguishable from ordinary QUIC. The Salamander code is not used by the active transport, is not encryption, and has not been evaluated against DPI. No DPI resistance is guaranteed.
 
-log:
-  level: info
-```
+See SECURITY.md for the limitations and pre-deployment checklist.
 
-### Client (`client.yaml`)
+## Tests and builds
 
-```yaml
-server: "your-vps.example.com:443"
+The GitHub Actions workflow on main runs go test -race ./..., go vet ./..., and builds both client and server. A successful CI run is necessary but not a substitute for a real client-to-VPS test.
 
-auth:
-  password: "your-strong-password"
-
-tls:
-  insecure: false   # set true for self-signed cert
-  sni: ""           # override SNI if needed
-
-congestion:
-  mode: auto        # auto, brutal, economy
-  up_mbps: 50       # your upload bandwidth hint
-
-transport:
-  # auto: tries UDP, falls back to WebSocket if UDP blocked
-  # udp:  UDP/QUIC only
-  # ws:   WebSocket only
-  mode: auto
-
-mobile:
-  # Ping interval to keep connection alive through NAT
-  # Slows to 55s automatically when app is idle
-  keepalive_interval: 25s
-
-log:
-  level: info
-```
-
----
-
-## Congestion Modes
-
-| Mode | Window multiplier | When to use |
-|---|---|---|
-| `brutal` | 2× | Bad networks, high packet loss, max throughput |
-| `economy` | 1× | Good networks, mobile, battery conservation |
-| `auto` | adaptive | **Default** — switches automatically with hysteresis |
-
-**Auto mode** switches to Economy when loss < 1% and RTT is stable. Switches back to Brutal when loss > 3% or RTT spikes. A hysteresis counter prevents rapid toggling.
-
----
-
-## Obfuscation
-
-HyL contains a Salamander-style packet-obfuscation prototype. Packet salts now use Go's `crypto/rand`, rather than predictable `math/rand`. **Obfuscation is not encryption or authentication and does not guarantee resistance to DPI.** A future working implementation must rely on correctly configured QUIC/TLS for confidentiality and integrity. QUIC Initial packets expose some handshake information to passive observers; see [RFC 9001](https://www.rfc-editor.org/rfc/rfc9001.html).
-
-To enable:
-```yaml
-# server.yaml
-obfs:
-  type: salamander
-  password: "obfs-psk-separate-from-auth"
-```
-
----
-
-## Architecture
-
-```
-Client                              Server
-  │                                   │
-  │  QUIC over UDP (or WS fallback)   │
-  │◄─────────────────────────────────►│
-  │                                   │
-  │  [Salamander obfs layer]          │
-  │  [AdaptiveSender CC]              │
-  │  [KeepaliveManager]               │
-  │  [TransportSwitcher]              │
-```
-
----
-
-## Building from source
-
-```bash
-git clone https://github.com/qualitydll/hyl
-cd hyl
-go build ./cmd/hyl-server
-go build ./cmd/hyl-client
-```
-
----
-
-## Roadmap
-
-- [ ] Full QUIC connection implementation (client ↔ server)
-- [ ] SOCKS5 local proxy
-- [ ] TUN mode (full VPN)
-- [ ] UDP hop (port rotation for whitelist bypass)
-- [ ] Android/iOS SDK via `gomobile`
-- [ ] Automated GitHub Releases + Homebrew bottle CI
-
----
-
-## Security status
-
-See [SECURITY.md](SECURITY.md) for current limitations and deployment guidance. HyL is not ready for public or production use; its server does not implement authentication, a QUIC listener, or a traffic-forwarding data plane.
-
----
+    go mod tidy
+    go test -race ./...
+    go vet ./...
+    go build ./cmd/hyl-server
+    go build ./cmd/hyl-client
 
 ## License
 
-MIT — see [LICENSE](LICENSE).  
-Based on [Hysteria2](https://github.com/apernet/hysteria) (MIT).
+MIT. See LICENSE.
