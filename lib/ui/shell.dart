@@ -290,7 +290,7 @@ class _Settings extends StatelessWidget {
       ])),
       const SizedBox(height: 12), _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Подключение', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-        SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('TUN на Windows'), subtitle: const Text('Перехват системного трафика'), value: s.tun, onChanged: (v) => state.setTun(v)),
+        if (!Platform.isAndroid) SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('TUN на Windows'), subtitle: const Text('Перехват системного трафика'), value: s.tun, onChanged: (v) => state.setTun(v)),
         if (!Platform.isAndroid) SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Системный прокси'), value: s.systemProxy, onChanged: (v) => state.setSystemProxy(v)),
         SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Разрешить LAN'), value: s.allowLan, onChanged: (v) => state.setAllowLan(v)),
         SegmentedButton<String>(segments: const [ButtonSegment(value: 'rule', label: Text('Правила')), ButtonSegment(value: 'global', label: Text('Глобально')), ButtonSegment(value: 'direct', label: Text('Напрямую'))], selected: {s.mode}, onSelectionChanged: (v) => state.setMode(v.first)),
