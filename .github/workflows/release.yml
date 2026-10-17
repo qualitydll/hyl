@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22.x"
-          cache: true
+          cache: false
 
       - name: Resolve Go modules
         run: go mod tidy
