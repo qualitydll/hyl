@@ -25,6 +25,8 @@ import (
 func TestIsPublicIP(t *testing.T) {
 	tests := []struct { ip string; ok bool }{
 		{"1.1.1.1", true}, {"8.8.8.8", true},
+		{"100.64.0.1", false}, {"192.0.2.1", false},
+		{"198.18.0.1", false}, {"2001:db8::1", false},
 		{"127.0.0.1", false}, {"10.0.0.1", false},
 		{"192.168.1.1", false}, {"169.254.1.1", false},
 		{"::1", false}, {"fc00::1", false}, {"ff02::1", false},
