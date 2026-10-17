@@ -82,7 +82,7 @@ class Settings {
   set reducedMotion(bool v) => _prefs.setBool('reducedMotion', v);
 
   int get animationDuration => _prefs.getInt('animationDuration') ?? 360;
-  set animationDuration(int v) => _prefs.setInt('animationDuration', v.clamp(0, 900));
+  set animationDuration(int v) => _prefs.setInt('animationDuration', v.clamp(0, 900).toInt());
 
   String get motionPreset => _prefs.getString('motionPreset') ?? 'fluid';
   set motionPreset(String v) => _prefs.setString('motionPreset', v);
@@ -91,7 +91,7 @@ class Settings {
   set compactDensity(bool v) => _prefs.setBool('compactDensity', v);
 
   int get connectButtonSize => _prefs.getInt('connectButtonSize') ?? 1;
-  set connectButtonSize(int v) => _prefs.setInt('connectButtonSize', v.clamp(0, 2));
+  set connectButtonSize(int v) => _prefs.setInt('connectButtonSize', v.clamp(0, 2).toInt());
 
   bool get showTrafficChart => _prefs.getBool('showTrafficChart') ?? true;
   set showTrafficChart(bool v) => _prefs.setBool('showTrafficChart', v);
