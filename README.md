@@ -1,18 +1,46 @@
 # Crew
 
-Crew — cross-platform VPN client for Android and Windows, built with Flutter and the Mihomo core.
+**Crew** — VPN-клиент для Android и Windows на Flutter с ядром Mihomo. Интерфейс создан специально для Crew: Material 3, адаптация под размер окна и экрана, плавные переходы и настройки доступности.
 
-## Goals
-- A polished, accessible Material 3 interface with carefully tuned motion.
-- Android and Windows clients with profile/subscription management.
-- Mihomo-powered proxy groups, live traffic, logs, and connection monitoring.
-- User-customizable appearance, motion intensity, compact/comfortable density, and startup behavior.
+## Что уже заложено
 
-## Development status
-The repository was initialized as a clean project. Core integration and UI are being added incrementally; features should be considered complete only after automated builds and device testing.
+- Подключение и отключение VPN из главного экрана.
+- Импорт ссылок подписки и конфигураций Mihomo.
+- Список групп и узлов, проверка задержки.
+- Текущая скорость, статистика трафика, активные соединения и журнал ядра.
+- Светлая, тёмная и системная тема; палитра акцентов.
+- Несколько стилей анимации, настройка длительности, уменьшение движения, компактный режим и выбор размера кнопки подключения.
+- Компактное окно Windows вместо запуска на весь экран.
+- Android VPNService со встроенной библиотекой Mihomo; Windows использует отдельный исполняемый файл Mihomo.
 
-## Core and protocol compatibility
-Crew uses Mihomo as its primary core. Supported node types depend on the pinned Mihomo version and the provider's subscription format. Unsupported protocols or fields should be reported clearly rather than silently pretending to connect.
+## Совместимость протоколов
 
-## License
-Mihomo is distributed under GPL-3.0. Review third-party notices and corresponding source requirements before distributing Crew builds.
+Crew передаёт конфигурации Mihomo в ядро. Совместимость зависит от версии ядра и параметров сервера. Среди протоколов, которые поддерживаются современными версиями Mihomo, — VLESS, VMess, Shadowsocks, Trojan, Hysteria2, TUIC, AnyTLS, Snell, Mieru, Sudoku, ShadowQUIC и TrustTunnel. Наличие протокола в ядре не означает, что любая ссылка или любая комбинация транспорта автоматически будет поддержана. Для подписок предпочтителен формат Mihomo/Clash YAML.
+
+## Сборка из исходников
+
+Нужны Flutter stable, Android SDK (для APK), Windows toolchain (для Windows-версии) и Python 3.
+
+1. Клонируй репозиторий.
+2. Выполни команду python scripts/merge_flutter_scaffold.py, чтобы создать отсутствующие стандартные файлы Android и Windows.
+3. Выполни flutter pub get.
+4. Запусти проверки: flutter analyze и flutter test.
+5. Android: flutter build apk --release --target-platform android-arm64.
+6. Windows: flutter build windows --release.
+
+GitHub Actions выполняет эти шаги автоматически, проверяет APK и прикладывает артефакты к запуску сборки. Для Windows workflow скачивает зафиксированную версию Mihomo и помещает её рядом с приложением.
+
+## Тестовые сборки
+
+Открой вкладку **Actions** в GitHub и выбери последний успешный запуск **Build Crew (Android + Windows)**. Android APK публикуется как Crew.apk; Windows — как архив Crew-Windows-x64.
+
+## Важное перед распространением
+
+- Первое подключение на Android требует системного разрешения VPN.
+- TUN на Windows может требовать права администратора и ручную проверку на конкретной системе.
+- Сборки CI не заменяют тестирование на реальном устройстве и с реальными подписками.
+- Перед публикацией настрой подпись Android-релиза и сохрани уведомления о лицензиях сторонних компонентов.
+
+## Лицензия
+
+Код, перенесённый из Brew, распространяется по GPL-3.0-or-later. Mihomo и libmihomo-android также требуют соблюдения своих лицензий и условий распространения исходного кода.

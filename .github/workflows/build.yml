@@ -1,0 +1,111 @@
+name: Build Crew (Android + Windows)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: crew-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Create missing platform scaffold
+        run: python3 scripts/merge_flutter_scaffold.py
+      - name: Generate Crew Windows icon
+        run: |
+          python -m pip install Pillow
+          python scripts/generate_crew_icon.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-36 build-tools;36.0.0 ndk;28.0.13004108"
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze and test
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Build Android ARM64 APK
+        run: flutter build apk --release --target-platform android-arm64
+      - name: Verify APK and rename
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=build/app/outputs/flutter-apk/app-release.apk
+          test -s "$apk"
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          badging="$("$aapt" dump badging "$apk")"
+          grep -Fq "package: name='dev.crew.crew'" <<<"$badging"
+          grep -Fq "application-label:'Crew'" <<<"$badging"
+          manifest="$("$aapt" dump xmltree "$apk" AndroidManifest.xml)"
+          grep -Fq "MihomoVpnService" <<<"$manifest"
+          grep -Fq "android.net.VpnService" <<<"$manifest"
+          for library in libclash.so libmihomo-jni.so; do
+            unzip -Z1 "$apk" | grep -qx "lib/arm64-v8a/$library"
+          done
+          cp "$apk" build/app/outputs/flutter-apk/Crew.apk
+          ls -lh build/app/outputs/flutter-apk/Crew.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Crew-Android-ARM64
+          path: build/app/outputs/flutter-apk/Crew.apk
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Create missing platform scaffold
+        run: python scripts/merge_flutter_scaffold.py
+      - name: Generate Crew Windows icon
+        run: |
+          python -m pip install Pillow
+          python scripts/generate_crew_icon.py
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze and test
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test
+      - name: Build Windows
+        run: flutter build windows --release
+      - name: Bundle pinned Mihomo core
+        shell: pwsh
+        run: |
+          $version = "v1.19.32"
+          $archive = Join-Path $env:RUNNER_TEMP "mihomo-$version.zip"
+          $url = "https://github.com/MetaCubeX/mihomo/releases/download/$version/mihomo-windows-amd64-$version.zip"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $extract = Join-Path $env:RUNNER_TEMP "mihomo-core"
+          Expand-Archive -Path $archive -DestinationPath $extract -Force
+          $binary = Get-ChildItem -Path $extract -Filter "mihomo*.exe" -File -Recurse | Select-Object -First 1
+          if ($null -eq $binary) { throw "Pinned Mihomo archive did not contain an executable." }
+          $target = "build/windows/x64/runner/Release/core"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Copy-Item $binary.FullName (Join-Path $target "mihomo.exe") -Force
+          & (Join-Path $target "mihomo.exe") -v
+          if ($LASTEXITCODE -ne 0) { throw "Bundled Mihomo core did not start." }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Crew-Windows-x64
+          path: build/windows/x64/runner/Release/
