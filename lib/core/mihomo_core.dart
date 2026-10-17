@@ -23,8 +23,8 @@ class MihomoCore {
   }) async {
     final candidates = <String>[
       if (customPath != null && customPath.isNotEmpty) customPath,
-      if (Platform.environment['BREW_CORE'] != null)
-        Platform.environment['BREW_CORE']!,
+      if (Platform.environment['CREW_CORE'] != null)
+        Platform.environment['CREW_CORE']!,
       p.join(p.dirname(Platform.resolvedExecutable), 'core', binaryName),
       p.join(p.dirname(Platform.resolvedExecutable), binaryName),
       p.join(dataDir, 'core', binaryName),
