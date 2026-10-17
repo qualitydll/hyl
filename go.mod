@@ -3,6 +3,7 @@ module github.com/qualitydll/hyl
 go 1.22
 
 require (
+	github.com/quic-go/quic-go v0.48.2
 	github.com/spf13/cobra v1.8.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.26.0
