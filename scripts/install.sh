@@ -122,7 +122,12 @@ if [[ "$BINARY_INSTALLED" == false ]]; then
     git clone --depth 1 "https://github.com/${REPO}.git" "$BUILD_DIR" -q
     info "Building hyl-server…"
     cd "$BUILD_DIR"
-    go build -o "$INSTALL_PATH" ./cmd/hyl-server
+    # The repository may not yet contain go.sum. Resolve dependencies first so
+    # Go can download modules and write the required checksums before building.
+    info "Resolving Go modules and generating dependency checksums…"
+    go mod tidy
+    info "Building hyl-server…"
+    go build -mod=mod -o "$INSTALL_PATH" ./cmd/hyl-server
     cd /
     rm -rf "$BUILD_DIR"
     chmod +x "$INSTALL_PATH"
