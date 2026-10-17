@@ -46,7 +46,7 @@ header "Installing dependencies"
 info "Updating package lists…"
 $UPDATE
 
-DEPS="curl openssl"
+DEPS="curl openssl git"
 info "Installing: $DEPS"
 $INSTALL $DEPS
 ok "Dependencies installed"
@@ -61,37 +61,69 @@ case "$ARCH" in
 esac
 ok "Architecture: $ARCH_LABEL"
 
-# ── Fetch latest release ───────────────────────────────────────────────────────
-header "Downloading HyL server"
+# ── Install Go if needed ───────────────────────────────────────────────────────
+install_go() {
+    info "Installing Go 1.22…"
+    local GO_VERSION="1.22.5"
+    local GO_TAR="go${GO_VERSION}.linux-${ARCH_LABEL}.tar.gz"
+    curl -fsSL "https://go.dev/dl/${GO_TAR}" -o "/tmp/${GO_TAR}"
+    rm -rf /usr/local/go
+    tar -C /usr/local -xzf "/tmp/${GO_TAR}"
+    rm -f "/tmp/${GO_TAR}"
+    export PATH="/usr/local/go/bin:$PATH"
+    ok "Go $(go version | awk '{print $3}') installed"
+}
+
+# ── Fetch binary or build from source ─────────────────────────────────────────
+header "Installing HyL server"
 
 REPO="qualitydll/hyl"
-RELEASE_URL="https://api.github.com/repos/${REPO}/releases/latest"
-
-info "Fetching latest release info…"
-LATEST_TAG=$(curl -fsSL "$RELEASE_URL" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-
-if [[ -z "$LATEST_TAG" ]]; then
-    warn "Could not detect latest release. Falling back to v0.1.0"
-    LATEST_TAG="v0.1.0"
-fi
-
-ok "Latest version: $LATEST_TAG"
-
-BINARY_NAME="hyl-server-linux-${ARCH_LABEL}"
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${BINARY_NAME}"
 INSTALL_PATH="/usr/local/bin/hyl-server"
+BINARY_INSTALLED=false
 
-info "Downloading $BINARY_NAME…"
-if ! curl -fsSL "$DOWNLOAD_URL" -o "$INSTALL_PATH" 2>/dev/null; then
-    warn "Pre-built binary not found. You need to build from source."
-    warn "Install Go 1.22+ then run: go build -o /usr/local/bin/hyl-server ./cmd/hyl-server"
-    warn "Continuing with configuration setup…"
-    # Create a placeholder so the rest of the script works
-    touch "$INSTALL_PATH"
+# 1) Попробовать скачать готовый бинарь с Releases
+info "Checking for pre-built releases…"
+LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
+    | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' || true)
+
+if [[ -n "$LATEST_TAG" ]]; then
+    BINARY_NAME="hyl-server-linux-${ARCH_LABEL}"
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${BINARY_NAME}"
+    info "Downloading ${BINARY_NAME} (${LATEST_TAG})…"
+    if curl -fsSL "$DOWNLOAD_URL" -o "$INSTALL_PATH" 2>/dev/null; then
+        chmod +x "$INSTALL_PATH"
+        ok "Binary downloaded: $LATEST_TAG"
+        BINARY_INSTALLED=true
+    else
+        warn "Pre-built binary not found in release, will build from source."
+    fi
+else
+    info "No releases found yet — building from source (this takes ~2 min)."
 fi
 
-chmod +x "$INSTALL_PATH"
-ok "Binary installed to $INSTALL_PATH"
+# 2) Fallback: собрать из исходников
+if [[ "$BINARY_INSTALLED" == false ]]; then
+    header "Building from source"
+
+    # Установить Go если нет
+    if ! command -v go &>/dev/null || ! go version | grep -qE 'go1\.(2[2-9]|[3-9][0-9])'; then
+        install_go
+    else
+        export PATH="/usr/local/go/bin:$PATH"
+        ok "Go already available: $(go version | awk '{print $3}')"
+    fi
+
+    BUILD_DIR=$(mktemp -d)
+    info "Cloning sources…"
+    git clone --depth 1 "https://github.com/${REPO}.git" "$BUILD_DIR" -q
+    info "Building hyl-server…"
+    cd "$BUILD_DIR"
+    go build -o "$INSTALL_PATH" ./cmd/hyl-server
+    cd /
+    rm -rf "$BUILD_DIR"
+    chmod +x "$INSTALL_PATH"
+    ok "Built and installed to $INSTALL_PATH"
+fi
 
 # ── Gather configuration ──────────────────────────────────────────────────────
 header "Configuration"
