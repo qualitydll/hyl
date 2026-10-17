@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apernet/quic-go/congestion"
-	"github.com/apernet/quic-go/monotime"
+	"github.com/qualitydll/hyl/internal/quiccompat/congestion"
+	"github.com/qualitydll/hyl/internal/quiccompat/monotime"
 )
 
 const (
