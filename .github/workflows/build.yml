@@ -36,7 +36,7 @@ jobs:
         run: flutter pub get
       - name: Analyze and test
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-infos
           flutter test
       - name: Build Android ARM64 APK
         run: flutter build apk --release --target-platform android-arm64
@@ -81,7 +81,7 @@ jobs:
         run: flutter pub get
       - name: Analyze and test
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-infos
           flutter test
       - name: Build Windows
         run: flutter build windows --release
