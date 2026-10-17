@@ -157,6 +157,7 @@ func handleTCPStreamWithDialer(stream *quic.Stream, dial func(context.Context, s
 		return
 	}
 	defer target.Close()
+	_ = stream.SetDeadline(time.Time{})
 	if _, err := stream.Write([]byte{0}); err != nil {
 		return
 	}
