@@ -6,10 +6,14 @@ import tempfile
 ROOT = Path.cwd()
 with tempfile.TemporaryDirectory(prefix="crew-flutter-scaffold-") as temp:
     scaffold = Path(temp) / "project"
-    subprocess.run([
+    import os
+    command = [
         "flutter", "create", "--platforms=android,windows",
         "--org", "dev.crew", "--project-name", "crew", str(scaffold)
-    ], check=True)
+    ]
+    if os.name == "nt":
+        command = ["cmd", "/c", *command]
+    subprocess.run(command, check=True)
     for platform in ("android", "windows"):
         source = scaffold / platform
         target = ROOT / platform
