@@ -148,7 +148,7 @@ func RunClient(ctx context.Context, cfg *config.ClientConfig) error {
 	}
 }
 
-func handleSOCKS5(ctx context.Context, conn *quic.Conn, local net.Conn) {
+func handleSOCKS5(ctx context.Context, conn quic.Connection, local net.Conn) {
 	defer local.Close()
 	_ = local.SetDeadline(time.Now().Add(15 * time.Second))
 	var greeting [2]byte
