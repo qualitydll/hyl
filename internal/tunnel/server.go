@@ -66,11 +66,11 @@ func RunServer(ctx context.Context, cfg *config.ServerConfig) error {
 	}
 }
 
-func serveConnection(ctx context.Context, conn *quic.Conn, password string) {
+func serveConnection(ctx context.Context, conn quic.Connection, password string) {
 	serveConnectionWithDialer(ctx, conn, password, dialPublicTCP)
 }
 
-func serveConnectionWithDialer(ctx context.Context, conn *quic.Conn, password string, dial func(context.Context, string, uint16) (net.Conn, error)) {
+func serveConnectionWithDialer(ctx context.Context, conn quic.Connection, password string, dial func(context.Context, string, uint16) (net.Conn, error)) {
 	defer conn.CloseWithError(0, "connection closed")
 	authCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -83,21 +83,21 @@ func serveConnectionWithDialer(ctx context.Context, conn *quic.Conn, password st
 
 	kind, err := readByte(stream)
 	if err != nil || kind != authRequest {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	var length uint16
 	if err := binary.Read(stream, binary.BigEndian, &length); err != nil || length == 0 || length > 1024 {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	got := make([]byte, int(length))
 	if _, err := io.ReadFull(stream, got); err != nil {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	if subtle.ConstantTimeCompare(got, []byte(password)) != 1 {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	_ = stream.SetDeadline(time.Time{})
@@ -125,27 +125,27 @@ func handleTCPStreamWithDialer(stream quic.Stream, dial func(context.Context, st
 	_ = stream.SetDeadline(time.Now().Add(10 * time.Second))
 	kind, err := readByte(stream)
 	if err != nil || kind != connectTCP {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	var hostLen uint16
 	if err := binary.Read(stream, binary.BigEndian, &hostLen); err != nil || hostLen == 0 || hostLen > maxHostBytes {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	hostBytes := make([]byte, int(hostLen))
 	if _, err := io.ReadFull(stream, hostBytes); err != nil {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	var port uint16
 	if err := binary.Read(stream, binary.BigEndian, &port); err != nil || port == 0 {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	host := string(hostBytes)
 	if host == "" {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 
@@ -153,7 +153,7 @@ func handleTCPStreamWithDialer(stream quic.Stream, dial func(context.Context, st
 	defer cancel()
 	target, err := dial(ctx, host, port)
 	if err != nil {
-		_ = stream.Write([]byte{1})
+		_, _ = stream.Write([]byte{1})
 		return
 	}
 	defer target.Close()
@@ -239,8 +239,8 @@ func relay(stream quic.Stream, target net.Conn) {
 	<-done
 	<-done
 	_ = target.Close()
-	_ = stream.CancelRead(0)
-	_ = stream.CancelWrite(0)
+	stream.CancelRead(0)
+	stream.CancelWrite(0)
 }
 
 func readByte(r io.Reader) (byte, error) {
