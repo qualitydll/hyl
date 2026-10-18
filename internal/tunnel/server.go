@@ -116,11 +116,11 @@ func serveConnectionWithDialer(ctx context.Context, conn *quic.Conn, password st
 	}
 }
 
-func handleTCPStream(stream *quic.Stream) {
+func handleTCPStream(stream quic.Stream) {
 	handleTCPStreamWithDialer(stream, dialPublicTCP)
 }
 
-func handleTCPStreamWithDialer(stream *quic.Stream, dial func(context.Context, string, uint16) (net.Conn, error)) {
+func handleTCPStreamWithDialer(stream quic.Stream, dial func(context.Context, string, uint16) (net.Conn, error)) {
 	defer stream.Close()
 	_ = stream.SetDeadline(time.Now().Add(10 * time.Second))
 	kind, err := readByte(stream)
@@ -222,7 +222,7 @@ func isPublicIP(ip net.IP) bool {
 	return !documentationIPv6.Contains(ip)
 }
 
-func relay(stream *quic.Stream, target net.Conn) {
+func relay(stream quic.Stream, target net.Conn) {
 	done := make(chan struct{}, 2)
 	go func() {
 		_, _ = io.Copy(target, stream)
