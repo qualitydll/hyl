@@ -171,17 +171,27 @@ chmod 700 /etc/hyl
 CERT_PATH="/etc/hyl/server.crt"
 KEY_PATH="/etc/hyl/server.key"
 
-if [[ ! -f "$CERT_PATH" || ! -f "$KEY_PATH" ]]; then
+if [[ ! -f "$CERT_PATH" || ! -f "$KEY_PATH" ]] || ! openssl x509 -in "$CERT_PATH" -noout >/dev/null 2>&1; then
     info "Generating self-signed TLS certificate…"
-    openssl req -x509 -newkey rsa:4096 \
-        -keyout "$KEY_PATH" \
-        -out "$CERT_PATH" \
+    TMP_CERT="$(mktemp /etc/hyl/server.crt.XXXXXX)"
+    TMP_KEY="$(mktemp /etc/hyl/server.key.XXXXXX)"
+    if ! openssl req -x509 -newkey rsa:3072 -sha256 \
+        -keyout "$TMP_KEY" \
+        -out "$TMP_CERT" \
         -days 3650 \
         -nodes \
         -subj "/CN=${SERVER_IP}" \
-        -addext "subjectAltName=IP:${SERVER_IP}" \
-        -quiet 2>/dev/null
-    chmod 600 "$KEY_PATH"
+        -addext "subjectAltName=IP:${SERVER_IP}"; then
+        rm -f "$TMP_CERT" "$TMP_KEY"
+        die "TLS certificate generation failed. OpenSSL printed the underlying error above; check that SERVER_IP is a valid IP address and that /etc/hyl is writable."
+    fi
+    if ! openssl x509 -in "$TMP_CERT" -noout >/dev/null 2>&1 || [[ ! -s "$TMP_KEY" ]]; then
+        rm -f "$TMP_CERT" "$TMP_KEY"
+        die "OpenSSL returned without creating a valid certificate and private key."
+    fi
+    install -m 0640 "$TMP_CERT" "$CERT_PATH"
+    install -m 0600 "$TMP_KEY" "$KEY_PATH"
+    rm -f "$TMP_CERT" "$TMP_KEY"
     ok "TLS certificate generated (10-year validity)"
 else
     ok "Using existing TLS certificate"
